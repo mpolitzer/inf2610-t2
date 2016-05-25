@@ -4,9 +4,8 @@
 
 layout(location = 0) uniform mat4 MVP;
 layout(location = 1) uniform mat4 MV;
-layout(location = 2) uniform mat4 N;
-layout(location = 3) uniform mat4 iVP;
-layout(location = 4) uniform mat4 iP;
+layout(location = 3) uniform mat4 iP;
+layout(location = 4) uniform mat4 iVP;
 layout(location = 5) uniform mat4 iMVP;
 
 

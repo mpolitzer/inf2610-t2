@@ -35,8 +35,8 @@ void main() {
 	//vec3 bit   = normalize(cross(nor, tg) * v_tan.w);
 
 	//f_TBN   = mat3(tg, bit, nor);
-	f_pos = (      v_pos);
-	f_nor = (N *   v_nor).xyz;
+	f_pos = (MV  * v_pos);
+	f_nor = (N   * v_nor).xyz;
 	//f_tan = v_tan;
 	//f_tex = v_tex;
 }

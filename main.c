@@ -145,8 +145,8 @@ static void init(uint32_t w, uint32_t h)
 	//}
 
 	// setup camera default position
-	_gi.cam.phi   = M_PI;
-	_gi.cam.theta =-M_PI/2;
+	_gi.cam.phi   = 0.9*M_PI;
+	_gi.cam.theta =-0.6*M_PI;
 	_gi.cam.pos   = tz_vec4_mkp(0, 1, 0);
 
 	// setup a redraw callback
@@ -280,7 +280,7 @@ static void setup_deferred_shading(uint32_t w, uint32_t h) {
 	//glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 	// pos
 	glGenTextures(1, &_gi.tex[1]);
@@ -397,17 +397,17 @@ static void do_geometry_pass()
 	tz_mat4 model_matrix, view_matrix, mvp_matrix;
 	tz_cam_mkview(&_gi.cam, &view_matrix);
 
-	// TODO: fix this horrible matrix craziness
+	// TODO: unecessary matrices multiplication
 	for (int i=0; i<_gi.nlights; ++i) {
 
 		tz_mat4_set_translation(&model_matrix, _gi.light[i]);
 		tz_mat4_mul(&mvp_matrix, &_gi.VP, &model_matrix);
-
 		tz_mat4_mul(&_gi.MV, &view_matrix, &model_matrix);
-		tz_mat4_inverse(&_gi.N, &_gi.MV);
+		tz_mat4_mul(&_gi.MVP, &_gi.P, &_gi.MV);
+
+		tz_mat4_inverse(&_gi.N, &model_matrix);
 		tz_mat4_transpose(&_gi.N, &_gi.N);
 
-		tz_mat4_mul(&_gi.MVP, &_gi.P, &_gi.MV);
 		glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
 		glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
 		glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.N.f);
@@ -423,7 +423,7 @@ static void do_geometry_pass()
 	tz_mat4_inverse(&_gi.iMVP, &_gi.MVP);
 
 #if 1
-	tz_mat4_inverse(&_gi.N, &_gi.iMV);
+	tz_mat4_inverse(&_gi.N, &model_matrix);
 	tz_mat4_transpose(&_gi.N, &_gi.N);
 #else
 	tz_mat4_mkidentity(&_gi.N);
@@ -432,7 +432,6 @@ static void do_geometry_pass()
 	glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
 	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
 	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.N.f);
-	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.iMV.f);
 	glUniformMatrix4fv(4, 1, GL_TRUE,  _gi.iP.f);
 	glUniformMatrix4fv(5, 1, GL_TRUE,  _gi.iMVP.f);
 
@@ -497,8 +496,7 @@ static void do_shading_pass()
 	float tmp[4];
 	glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
 	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
-	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.N.f);
-	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.iMV.f);
+	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.iP.f);
 	glUniformMatrix4fv(4, 1, GL_TRUE,  _gi.iVP.f);
 	glUniformMatrix4fv(5, 1, GL_TRUE,  _gi.iMVP.f);
 

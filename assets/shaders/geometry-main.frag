@@ -30,7 +30,7 @@ void main()
 	//	n += f_TBN * (2*normal.rgb-1);
 	//}
 	o_data[1] = vec4(normalize(n), 1);
-	
+
 	vec4 col = vec4(1,1,1,1);
 	//if (enable_spec != 0) {
 	//	vec4 diffuse = texture( diffuse_map, f_tex);

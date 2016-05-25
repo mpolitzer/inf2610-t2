@@ -29,9 +29,8 @@ material_t materials[] = material_t[](
 /* -------------------------------------------------------------------------- */
 layout(location = 0) uniform mat4 MVP;
 layout(location = 1) uniform mat4 MV;
-layout(location = 2) uniform mat4 N;
-layout(location = 3) uniform mat4 iVP;
-layout(location = 4) uniform mat4 iP;
+layout(location = 3) uniform mat4 iP;
+layout(location = 4) uniform mat4 iVP;
 layout(location = 5) uniform mat4 iMVP;
 
 
@@ -50,7 +49,15 @@ in  vec2 f_tex;   // <- texture lookup
 in  vec2 f_pos;
 out vec4 o_color;
 
-void apply_light(vec3 pos, vec3 nor, vec4 col, vec3 light, vec3 attenuation, int mi, inout vec4 o_color)
+// in eye space
+void apply_light(
+		vec3 pos,
+		vec3 nor,
+		vec4 col,
+		vec3 light,
+		vec3 attenuation,
+		int mi,
+		inout vec4 o_color)
 {
 		vec3  l     = normalize(light - pos);
 		float llen  = length   (light - pos);
@@ -62,7 +69,7 @@ void apply_light(vec3 pos, vec3 nor, vec4 col, vec3 light, vec3 attenuation, int
 
 		//amb += vec3(.01, .01, .01);
 
-		vec3 view = normalize(eye.xyz - pos);
+		vec3 view = normalize(pos);
 		vec3 n = normalize(nor);
 		float ndotl = max(dot(l,n), 0.0);
 
@@ -75,7 +82,7 @@ void apply_light(vec3 pos, vec3 nor, vec4 col, vec3 light, vec3 attenuation, int
 			spc              = att * materials[mi].specular*pow(angle, shi);
 		}
 
-#if 0
+#if 1
 		o_color.rgb += (amb+dif) * col.rgb + spc * col.a;
 #else
 		o_color.rgb = view;
@@ -91,12 +98,16 @@ void main() {
 	float f = 1000.0;
 	float n = 1.0;
 
-	// from clip -> world
+	// from clip -> eye
 	float z = (2 * n) / (f + n - texture(Gdep, f_tex).r * (f - n));
-	vec4 pos = iMVP * vec4(f_pos, z, 1);
-	vec4 nor =      texture(Gnor, f_tex);
+	vec4 pos = iP *  vec4(f_pos, z, 1);
+
+	// from world -> eye
+	vec4 nor = texture(Gnor, f_tex);
+
 #else
 	vec4 pos = vec4(texture(Gpos, f_tex).xyz, 1);
+	// from world -> eye
 	vec4 nor = texture(Gnor, f_tex);
 #endif
 
@@ -116,7 +127,7 @@ void main() {
 		return;
 	}
 	if (debug_flag == 4) {
-		o_color = vec4(texture(Gdep, f_tex).rgb, 1);
+		o_color = vec4(texture(Gdep, f_tex).rrr, 1);
 		return;
 	}
 	if (debug_flag == 5) {
@@ -126,6 +137,7 @@ void main() {
 
 	o_color = vec4(0,0,0,1);
 	for (int i=0; i<nlights; ++i) {
+		vec4 l = MV * light[i];
 		apply_light(
 			pos.xyz,
 			nor.xyz,

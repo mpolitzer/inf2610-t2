@@ -98,18 +98,20 @@ void main() {
 	float f = 1000.0;
 	float n = 1.0;
 
-	// from clip -> eye
+	// pos: from clip -> eye
+	// make z linear
 	float z = (2 * n) / (f + n - texture(Gdep, f_tex).r * (f - n));
 	vec4 pos = iP *  vec4(f_pos, z, 1);
 
-	// from world -> eye
-	vec4 nor = texture(Gnor, f_tex);
-
+	// nor: from world -> eye
+	vec4 nor = MV * texture(Gnor, f_tex);
 #else
+	// already in eye space
 	vec4 pos = vec4(texture(Gpos, f_tex).xyz, 1);
 	// from world -> eye
-	vec4 nor = texture(Gnor, f_tex);
+	vec4 nor = MV * texture(Gnor, f_tex);
 #endif
+	pos.xyz = pos.xyz / pos.w;
 
 	vec4 col = texture(Gdif, f_tex);
 	int mi = 0;
@@ -142,7 +144,7 @@ void main() {
 			pos.xyz,
 			nor.xyz,
 			col,
-			light[i].xyz,
+			l.xyz,
 			vec3(0.1, 0.1, 0.01),
 			mi,
 			o_color);

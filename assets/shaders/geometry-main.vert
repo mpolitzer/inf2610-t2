@@ -14,5 +14,5 @@ out vec4 f_nor;
 
 void main() {
 	gl_Position = VP * M * v_pos;
-	f_nor = (N   * v_nor);
+	f_nor       = VP * N * v_nor;
 }

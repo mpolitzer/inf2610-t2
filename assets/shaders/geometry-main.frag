@@ -8,7 +8,7 @@ layout(location = 2) uniform mat4 N;
 
 in vec4 f_pos;
 in vec4 f_nor;
-out vec4 o_data[3];
+out vec4 o_data[2];
 
 void main()
 {

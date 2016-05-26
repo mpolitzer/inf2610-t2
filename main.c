@@ -362,7 +362,6 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
  * (transparent pass is after shading) */
 static void start_geometry_pass()
 {
-	//glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 
@@ -452,15 +451,14 @@ static void start_shading_pass()
 	glUniform4fv(0, 1, tmp);
 
 	glUniform1i(1, _deffered_shading_debug);
-	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.iVP.f);
-	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.V.f);
+	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.iP.f);
 }
 
 static void do_shading_pass()
 {
 	tz_vec4 tmp_lights[50];
 	for (int i=0; i<_gi.nlights; ++i) {
-		tmp_lights[i] = _gi.light[i]; // in world
+		tmp_lights[i] = tz_mat4_mulv(&_gi.V, _gi.light[i]); // in world
 	}
 
 	glUniform1i(9,  _gi.nlights);

@@ -29,8 +29,7 @@ material_t materials[] = material_t[](
 /* -------------------------------------------------------------------------- */
 layout(location = 0) uniform vec4 u_eye;
 layout(location = 1) uniform int debug_flag;
-layout(location = 2) uniform mat4 iVP;
-layout(location = 3) uniform mat4 V;
+layout(location = 2) uniform mat4 iP;
 
 layout(location = 9) uniform int nlights;
 layout(location =10) uniform vec4 light[50];
@@ -51,11 +50,10 @@ void apply_light(vec3 pos, vec3 nor, vec4 col, vec3 light,
 	float llen  = length   (light - pos.xyz);
 	float att   = 1.0/dot(vec3(1, llen, llen*llen), attenuation);
 
-	vec3 eye = normalize((u_eye / u_eye.w).xyz);
 	vec3 dif = vec3(0,  0,  0),
 		 spc = vec3(0,  0,  0);
 
-	vec3 view = normalize(eye - normalize(pos));
+	vec3 view = normalize(pos);
 	float ndotl = max(dot(n,l), 0.0);
 
 	dif += att * materials[mi].diffuse * ndotl;
@@ -74,9 +72,9 @@ void main()
 {
 	if (texture(Gdep, f_tex).r == 1) discard;
 
-	vec4 pos = iVP * vec4(f_pos, texture(Gdep, f_tex).r, 1);
-	vec4 nor = (2*texture(Gnor, f_tex)-1);
-	vec4 col =  2*texture(Gdif, f_tex)-1;
+	vec4 pos = iP * vec4(f_pos, texture(Gdep, f_tex).r, 1);
+	vec4 nor = 2*texture(Gnor, f_tex)-1;
+	vec4 col =   texture(Gdif, f_tex);
 
 	int mi = 1;
 

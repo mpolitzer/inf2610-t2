@@ -32,16 +32,7 @@
 #include "tz/tz/std/util.h"
 
 // models ----------------------------------------------------------------------
-#define CLASSROM "../assets/mesh/eyebot.ply"
-//#define CLASSROM "../assets/mesh/classrom.ply"
-//#define CLASSROM "../assets/mesh/predio.ply"
-//#define CLASSROM "../assets/mesh/new_csie.ply"
-//#define CLASSROM "../assets/mesh/eyebot.ply"
-
-#define EYEBOT          "../assets/mesh/new_csie.ply"
-#define EYEBOT_NORMAL   "../assets/tex/eyebot-normal.tga"
-#define EYEBOT_DIFFUSE  "../assets/tex/eyebot-diffuse.tga"
-#define EYEBOT_SPECULAR "../assets/tex/eyebot-specular-2.tga"
+#define FLOOR          "../assets/mesh/new_csie_2.ply"
 
 // shaders ---------------------------------------------------------------------
 #define GEOMETRY_VERT_NAME "../assets/shaders/geometry-main.vert"
@@ -55,12 +46,11 @@ typedef struct game_info_t {
 
 	tz_vec4 light[50];
 	int    nlights;
-	tz_mat4 V, MV, iMV, MVP, iMVP, P, iP, N;
+	tz_mat4 V, iV, MV, iMV, MVP, iMVP, P, iP, N;
 	tz_mat4 VP, iVP;
-	tz_mesh class, eyebot;
-	tz_gpu_obj class_obj, eyebot_obj;
+	tz_mesh floor;
+	tz_gpu_obj floor_obj;
 
-	//tz_tex eyebot_nor, eyebot_dif, eyebot_spc;
 	tz_cam  cam;
 
 	GLuint vao, vbo;
@@ -113,33 +103,33 @@ static void init(uint32_t w, uint32_t h)
 	tz_mat4_perspective(&_gi.P, 80, h/(float)w, 1, 1000);
 	tz_mat4_inverse(&_gi.iP, &_gi.P);
 
-	tz_mesh_load_ply(&_gi.class, CLASSROM);
+	//tz_mesh_load_ply(&_gi.class, CLASSROM);
 	//tz_mesh_gen_nor(&_gi.class);
 	//tz_mesh_gen_tan(&_gi.class);
 	//tz_mesh_print_prief(&_gi.class);
-	tz_gpu_obj_load_mesh(&_gi.class_obj, &_gi.class);
+	//tz_gpu_obj_load_mesh(&_gi.class_obj, &_gi.class);
 
 
-	// load eyebot ---------------------------------------------------------
-	//if (!tz_tex_load_tga(&_gi.eyebot_dif, EYEBOT_DIFFUSE))
+	// load floor ---------------------------------------------------------
+	//if (!tz_tex_load_tga(&_gi.floor_dif, EYEBOT_DIFFUSE))
 	//	die("Failed to open %s\n",    EYEBOT_DIFFUSE);
-	//if (!tz_tex_load_tga(&_gi.eyebot_nor, EYEBOT_NORMAL))
+	//if (!tz_tex_load_tga(&_gi.floor_nor, EYEBOT_NORMAL))
 	//	die("Failed to open %s\n",    EYEBOT_NORMAL);
-	//if (!tz_tex_load_tga(&_gi.eyebot_spc, EYEBOT_SPECULAR))
+	//if (!tz_tex_load_tga(&_gi.floor_spc, EYEBOT_SPECULAR))
 	//	die("Failed to open %s\n",    EYEBOT_SPECULAR);
 
-	tz_mesh_load_ply(&_gi.eyebot, EYEBOT);
-	tz_mesh_gen_nor(&_gi.eyebot);
-	tz_mesh_gen_tan(&_gi.eyebot);
-	tz_gpu_obj_load_mesh(&_gi.eyebot_obj, &_gi.eyebot);
+	tz_mesh_load_ply(&_gi.floor, FLOOR);
+	tz_mesh_gen_nor(&_gi.floor);
+	tz_mesh_gen_tan(&_gi.floor);
+	tz_gpu_obj_load_mesh(&_gi.floor_obj, &_gi.floor);
 	// ---------------------------------------------------------------------
 
 	_gi.nlights  = 1;
-	_gi.light[0] = tz_vec4_mkp(  0, 2,   0);
-	//_gi.light[1] = tz_vec4_mkp(-15, 2, -15);
-
-	for (int i=1; i<50; ++i) {
-		_gi.light[i] = tz_vec4_mkp(i%10+1, 2, i/10%10);
+	for (int i=0; i<5; ++i) {
+		for (int j=0; j<5; ++j) {
+			_gi.light[i+5*j]    = tz_vec4_mkp(11*i-25, 2, 8*j-19);
+			_gi.light[i+5*j+25] = tz_vec4_mkp(11*i-20, 2, 8*j-14);
+		}
 	}
 
 	// setup camera default position
@@ -166,7 +156,7 @@ static void redraw(void) {
 
 int main(int argc, const char *argv[])
 {
-	float fast=1.0, fwd=0.0, right=0.0, up=0.0;
+	float fast=1.0, fwd=0.0, right=0.0, up=0.0, dt=0.0;
 	init(1920, 1080);
 
 	SDL_Event e;
@@ -216,8 +206,8 @@ int main(int argc, const char *argv[])
 			if (e.key.keysym.sym == SDLK_LCTRL && e.key.repeat == 0) { up   +=0.1; }
 			if (e.key.keysym.sym == SDLK_LSHIFT&& e.key.repeat == 0) { fast  = 10; }
 
-			if (e.key.keysym.sym == SDLK_EQUALS && e.key.repeat == 0) { _gi.nlights++; }
-			if (e.key.keysym.sym == SDLK_MINUS && e.key.repeat == 0) { _gi.nlights--; }
+			if (e.key.keysym.sym == SDLK_EQUALS && e.key.repeat == 0) { _gi.nlights = tz_clamp_s32(_gi.nlights+1, 0, 50); }
+			if (e.key.keysym.sym == SDLK_MINUS && e.key.repeat == 0)  { _gi.nlights = tz_clamp_s32(_gi.nlights-1, 0, 50); }
 			break;
 		}
 		case SDL_MOUSEMOTION: {
@@ -236,8 +226,14 @@ int main(int argc, const char *argv[])
 			break;
 		}
 		case SDL_USEREVENT: {
-
-			tz_clamp_32(_gi.nlights, 0, 50);
+			dt += 1./60;
+			tz_clamp_s32(_gi.nlights, 0, 50);
+			for (int i=0; i<_gi.nlights; ++i) {
+				float t[4];
+				tz_vec4_store4fv(_gi.light[i], t);
+				t[1] = 2+sin(dt);
+				_gi.light[i] = tz_vec4_load4fv(t);
+			}
 			redraw();
 
 			tz_cam_fwd(&_gi.cam, fast*fwd);
@@ -275,7 +271,7 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 	// nor
 	glGenTextures(1, &_gi.tex[1]);
@@ -295,23 +291,28 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
+	// pos
+	glGenTextures(1, &_gi.tex[3]);
+	glBindTexture(GL_TEXTURE_2D, _gi.tex[3]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+
 	// framebuffer
 	glGenFramebuffers(1, &_gi.fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, _gi.fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,  GL_TEXTURE_2D, _gi.tex[0], 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gi.tex[1], 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _gi.tex[2], 0);
-	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, _gi.tex[3], 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, _gi.tex[3], 0);
 
 	// setup G-buffers
 	GLenum fbos[] = {
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
-		//GL_COLOR_ATTACHMENT2,
-		//GL_COLOR_ATTACHMENT3,
-		//GL_COLOR_ATTACHMENT2,
-		//GL_COLOR_ATTACHMENT3,
-		//GL_COLOR_ATTACHMENT4,
+		GL_COLOR_ATTACHMENT2,
 	};
 	glDrawBuffers(sizeof(fbos)/sizeof(*fbos), fbos);
 
@@ -371,8 +372,6 @@ static void start_geometry_pass()
 
 	tz_cam_mkview(&_gi.cam, &_gi.V);
 	tz_mat4_mul(&_gi.VP, &_gi.P, &_gi.V);
-	tz_mat4_inverse(&_gi.iVP, &_gi.VP);
-	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.VP.f);
 }
 
 /* fill G-objects (getting scene ready for shading pass) */
@@ -384,27 +383,39 @@ static void do_geometry_pass()
 	glUniform4fv(7, 1, eye);
 
 	for (int i=0; i<_gi.nlights; ++i) {
-		tz_mat4 model_matrix, normal_matrix;
+		tz_mat4 model_matrix, modelview_matrix, normal_matrix, mvp_matrix;
 
 		tz_mat4_set_translation(&model_matrix, _gi.light[i]);
-		tz_mat4_inverse(&normal_matrix, &model_matrix);
+		tz_mat4_mul(&modelview_matrix, &_gi.V, &model_matrix);
+		tz_mat4_mul(&mvp_matrix, &_gi.VP, &model_matrix);
+
+		tz_mat4_mul(&normal_matrix, &_gi.V, &model_matrix);
+		tz_mat4_inverse(&normal_matrix, &normal_matrix);
 		tz_mat4_transpose(&normal_matrix, &normal_matrix);
 
-		glUniformMatrix4fv(0, 1, GL_TRUE,  model_matrix.f);
+		glUniformMatrix4fv(0, 1, GL_TRUE,  modelview_matrix.f);
+		glUniformMatrix4fv(1, 1, GL_TRUE,  mvp_matrix.f);
 		glUniformMatrix4fv(2, 1, GL_TRUE,  normal_matrix.f);
 
 		glBindVertexArray(_gi.dbg_vao);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	}
 
-	tz_mat4 model_matrix, normal_matrix;
-	tz_mat4_mkidentity(&model_matrix);
-	tz_mat4_mkidentity(&normal_matrix);
+	tz_mat4 model_matrix, modelview_matrix, normal_matrix, mvp_matrix;
 
-	glUniformMatrix4fv(0, 1, GL_TRUE,  model_matrix.f);
+	tz_mat4_mkidentity(&model_matrix);
+	tz_mat4_mul(&modelview_matrix, &_gi.V, &model_matrix);
+	tz_mat4_mul(&mvp_matrix, &_gi.VP, &model_matrix);
+
+	tz_mat4_mul(&normal_matrix, &_gi.V, &model_matrix);
+	tz_mat4_inverse(&normal_matrix, &normal_matrix);
+	tz_mat4_transpose(&normal_matrix, &normal_matrix);
+
+	glUniformMatrix4fv(0, 1, GL_TRUE,  modelview_matrix.f);
+	glUniformMatrix4fv(1, 1, GL_TRUE,  mvp_matrix.f);
 	glUniformMatrix4fv(2, 1, GL_TRUE,  normal_matrix.f);
 
-	tz_gpu_obj_draw(&_gi.eyebot_obj);
+	tz_gpu_obj_draw(&_gi.floor_obj);
 }
 
 static void end_geometry_pass()
@@ -426,7 +437,7 @@ static void start_shading_pass()
 
 	glActiveTexture(GL_TEXTURE0+2);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[2]);
-#if 0
+#if 1
 	glActiveTexture(GL_TEXTURE0+3);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[3]);
 #endif
@@ -442,28 +453,39 @@ static void start_shading_pass()
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	tz_shader_bind(&_gi.shading);
 
-	glBindVertexArray(_gi.vao);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
 	float tmp[4];
+
+	glBindVertexArray(_gi.vao);
 
 	tz_vec4_store4fv(_gi.cam.pos, tmp);
 	glUniform4fv(0, 1, tmp);
 
 	glUniform1i(1, _deffered_shading_debug);
-	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.iP.f);
-}
 
-static void do_shading_pass()
-{
+	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.iP.f);
+	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.iV.f);
+	glUniformMatrix4fv(4, 1, GL_TRUE,  _gi.V.f);
+	glUniformMatrix4fv(5, 1, GL_TRUE,  _gi.P.f);
+
+
 	tz_vec4 tmp_lights[50];
 	for (int i=0; i<_gi.nlights; ++i) {
-		tmp_lights[i] = tz_mat4_mulv(&_gi.V, _gi.light[i]); // in world
+		// world
+		//tmp_lights[i] = _gi.light[i];
+
+		// world -> eye
+		tmp_lights[i] = tz_mat4_mulv(&_gi.V, _gi.light[i]);
 	}
 
 	glUniform1i(9,  _gi.nlights);
 	glUniform4fv(10, _gi.nlights, (float *)tmp_lights);
 
+}
+
+static void do_shading_pass()
+{
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 

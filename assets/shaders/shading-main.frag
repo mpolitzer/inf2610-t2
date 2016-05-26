@@ -27,9 +27,11 @@ material_t materials[] = material_t[](
 );
 
 /* -------------------------------------------------------------------------- */
-layout(location = 0) uniform vec4 u_eye;
 layout(location = 1) uniform int debug_flag;
 layout(location = 2) uniform mat4 iP;
+layout(location = 3) uniform mat4 iV;
+layout(location = 4) uniform mat4 V;
+layout(location = 5) uniform mat4 P;
 
 layout(location = 9) uniform int nlights;
 layout(location =10) uniform vec4 light[50];
@@ -37,61 +39,79 @@ layout(location =10) uniform vec4 light[50];
 layout(binding = 0) uniform sampler2D Gdep;
 layout(binding = 1) uniform sampler2D Gnor;
 layout(binding = 2) uniform sampler2D Gdif;
+layout(binding = 3) uniform sampler2D Gpos;
 
-in  vec2 f_tex;   // <- texture lookup
 in  vec2 f_pos;
 out vec4 o_color;
 
-void apply_light(vec3 pos, vec3 nor, vec4 col, vec3 light,
-		         vec3 attenuation, int mi, inout vec4 o_color)
-{
-	vec3  n     = normalize(nor);
-	vec3  l     = normalize(light - pos.xyz);
-	float llen  = length   (light - pos.xyz);
-	float att   = 1.0/dot(vec3(1, llen, llen*llen), attenuation);
-
-	vec3 dif = vec3(0,  0,  0),
-		 spc = vec3(0,  0,  0);
-
-	vec3 view = normalize(pos);
-	float ndotl = max(dot(n,l), 0.0);
-
-	dif += att * materials[mi].diffuse * ndotl;
-
-	if (ndotl > 0) {
-		vec3  reflection = reflect(-l, n);
-		float angle      = max(dot(reflection,view), 0.0);
-		float shi        = materials[mi].shininess;
-		spc              = att * materials[mi].specular*pow(angle, shi);
-	}
-
-	o_color.rgb += dif + spc;
-}
-
 void main()
 {
-	if (texture(Gdep, f_tex).r == 1) discard;
+	vec2 tex = 0.5*f_pos+0.5;
+	if (texture(Gdep, tex).r == 1) discard;
 
-	vec4 pos = iP * vec4(f_pos, texture(Gdep, f_tex).r, 1);
-	vec4 nor = 2*texture(Gnor, f_tex)-1;
-	vec4 col =   texture(Gdif, f_tex);
+	float dep = texture(Gdep, tex).r*2-1;
+	vec4  pos = iP * vec4(f_pos, dep, 1); // clip -> eye
+	//vec4  pos = texture(Gpos, tex)*2-1;
+	vec4  nor = texture(Gnor, tex)*-2+1;
+	vec4  col = texture(Gdif, tex);
 
 	int mi = 1;
 
-	if (debug_flag ==-2) { o_color = col; return; }
-	if (debug_flag == 1) { o_color = nor;              return; }
-	if (debug_flag == 2) { o_color = vec4(pos.xyz, 1); return; }
-	if (debug_flag == 3) { o_color = vec4(texture(Gdep, f_tex).rrr, 1); return;
+	if (debug_flag == 1) { o_color = abs(nor);               return; }
+	if (debug_flag == 2) { o_color = vec4(pos.xyz/pos.w, 1); return; }
+	if (debug_flag == 3) { // in eye coordiantes
+		vec4 p = texture(Gpos, tex);
+		o_color = vec4(p.xyz/p.w, 1);
+		return;
 	}
 
-	o_color = vec4(0,0,0,1);
+	if (debug_flag == 4) { o_color = vec4(texture(Gdep, tex).rrr, 1); return; }
+
+	vec3 color = vec3(0,0,0);;
 	for (int i=0; i<nlights; ++i) {
-		apply_light(pos.xyz / pos.w,
-					nor.xyz / nor.w,
-					col,
-					light[i].xyz / light[i].w,
-					vec3(0.1, 0.1, 0.01),
-					mi,
-					o_color);
+		vec3 p     = (pos/pos.w).xyz;
+		vec3 view  = normalize(p);
+		vec3 n     = normalize(nor/nor.w).xyz;
+
+		vec3 l_    = light[i].xyz/light[i].w - p;
+		vec3 l     = normalize(l_);
+		float llen = length(l_);
+		float att  = 1.0 / dot(vec3(1, llen, llen*llen), vec3(0.1, 0.1, 0.5));
+
+		vec3 dif_mat = vec3(1,1,1),
+		     spc_mat = vec3(1,1,1);
+
+		vec3 dif = vec3(0,0,0),
+		     spc = vec3(0,0,0);
+
+		float ndotl = max(dot(n,l), 0);
+		if (ndotl > 0) {
+			dif = att * ndotl * dif_mat;
+
+			vec3 reflected = reflect(-l,n);
+			float angle    = clamp(dot(reflected,view), 0.0, 1.0);
+			float shi      = 30;
+			spc = att * pow(angle, shi) * spc_mat; // <- insert material specular + shininess
+		}
+
+		if (debug_flag == -1)
+			color += dif;
+		else if (debug_flag == -2)
+			color += spc;
+		else
+			color += dif + spc;
 	}
+
+	o_color.rgb = color;
+	o_color.a   = 1;
+
+	//for (int i=0; i<nlights; ++i) {
+	//	apply_light(pos.xyz / pos.w,
+	//				nor.xyz / nor.w,
+	//				col,
+	//				light[i].xyz / light[i].w,
+	//				vec3(0.1, 0.1, 0.05),
+	//				mi,
+	//				o_color);
+	//}
 }

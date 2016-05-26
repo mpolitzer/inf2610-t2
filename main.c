@@ -55,7 +55,7 @@ typedef struct game_info_t {
 
 	tz_vec4 light[50];
 	int    nlights;
-	tz_mat4 MV, iMV, MVP, iMVP, P, iP, N;
+	tz_mat4 V, MV, iMV, MVP, iMVP, P, iP, N;
 	tz_mat4 VP, iVP;
 	tz_mesh class, eyebot;
 	tz_gpu_obj class_obj, eyebot_obj;
@@ -135,19 +135,17 @@ static void init(uint32_t w, uint32_t h)
 	// ---------------------------------------------------------------------
 
 	_gi.nlights  = 1;
-	_gi.light[0] = tz_vec4_mkv(  0, 2,   0);
-	_gi.light[1] = tz_vec4_mkv(-15, 2, -15);
+	_gi.light[0] = tz_vec4_mkp(  0, 2,   0);
+	//_gi.light[1] = tz_vec4_mkp(-15, 2, -15);
 
-	//for (int i=0; i<10; ++i) {
-	//	for (int j=0; j<5; ++j) {
-	//		_gi.light[i+5*j] = tz_vec4_mkv(5*(i-5), 2, 5*(j-2.5));
-	//	}
-	//}
+	for (int i=1; i<50; ++i) {
+		_gi.light[i] = tz_vec4_mkp(i%10+1, 2, i/10%10);
+	}
 
 	// setup camera default position
 	_gi.cam.phi   = 0.9*M_PI;
-	_gi.cam.theta =-0.6*M_PI;
-	_gi.cam.pos   = tz_vec4_mkp(0, 1, 0);
+	_gi.cam.theta = 0.75*M_PI;
+	_gi.cam.pos   = tz_vec4_mkp(40, 40, 40);
 
 	// setup a redraw callback
 	Uint32 delay = (33 / 10) * 10;
@@ -168,7 +166,7 @@ static void redraw(void) {
 
 int main(int argc, const char *argv[])
 {
-	float fwd=0.0, right=0.0, up=0.0;
+	float fast=1.0, fwd=0.0, right=0.0, up=0.0;
 	init(1920, 1080);
 
 	SDL_Event e;
@@ -206,6 +204,7 @@ int main(int argc, const char *argv[])
 			if (e.key.keysym.sym == SDLK_a)     { right-=0.1; }
 			if (e.key.keysym.sym == SDLK_SPACE) { up   +=0.1; }
 			if (e.key.keysym.sym == SDLK_LCTRL) { up   -=0.1; }
+			if (e.key.keysym.sym == SDLK_LSHIFT){ fast  =  1; }
 			break;
 		}
 		case SDL_KEYDOWN: {
@@ -215,6 +214,7 @@ int main(int argc, const char *argv[])
 			if (e.key.keysym.sym == SDLK_d && e.key.repeat == 0)     { right-=0.1; }
 			if (e.key.keysym.sym == SDLK_SPACE && e.key.repeat == 0) { up   -=0.1; }
 			if (e.key.keysym.sym == SDLK_LCTRL && e.key.repeat == 0) { up   +=0.1; }
+			if (e.key.keysym.sym == SDLK_LSHIFT&& e.key.repeat == 0) { fast  = 10; }
 
 			if (e.key.keysym.sym == SDLK_EQUALS && e.key.repeat == 0) { _gi.nlights++; }
 			if (e.key.keysym.sym == SDLK_MINUS && e.key.repeat == 0) { _gi.nlights--; }
@@ -240,9 +240,9 @@ int main(int argc, const char *argv[])
 			tz_clamp_32(_gi.nlights, 0, 50);
 			redraw();
 
-			tz_cam_fwd(&_gi.cam, fwd);
-			tz_cam_up(&_gi.cam, up);
-			tz_cam_strafe(&_gi.cam, right);
+			tz_cam_fwd(&_gi.cam, fast*fwd);
+			tz_cam_up(&_gi.cam, fast*up);
+			tz_cam_strafe(&_gi.cam, fast*right);
 			//tz_vec4_print(_gi.cam.pos);
 		}}
 
@@ -254,13 +254,10 @@ finalize_program:
 	return 0;
 }
 
-static void setup_deferred_shading(uint32_t w, uint32_t h) {
-
+static void setup_deferred_shading(uint32_t w, uint32_t h)
+{
+	glCullFace(GL_BACK);
 	glClearColor(0,0,0,1);
-	// TODO: disable for shading pass
-	//glCullFace(GL_BACK);
-	//glEnable(GL_CULL_FACE);
-	//glDisable(GL_BLEND);
 
 	/* create a framebuffer to attach output textures.
 	 * create the textures and bind them to the framebuffer object
@@ -273,40 +270,29 @@ static void setup_deferred_shading(uint32_t w, uint32_t h) {
 	// depth
 	glGenTextures(1, &_gi.tex[0]);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-	// pos
-	glGenTextures(1, &_gi.tex[1]);
-	glBindTexture(GL_TEXTURE_2D, _gi.tex[1]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 	// nor
-	glGenTextures(1, &_gi.tex[2]);
-	glBindTexture(GL_TEXTURE_2D, _gi.tex[2]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_FLOAT, NULL);
+	glGenTextures(1, &_gi.tex[1]);
+	glBindTexture(GL_TEXTURE_2D, _gi.tex[1]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
 	// diffuse + shininess
-	glGenTextures(1, &_gi.tex[3]);
-	glBindTexture(GL_TEXTURE_2D, _gi.tex[3]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glGenTextures(1, &_gi.tex[2]);
+	glBindTexture(GL_TEXTURE_2D, _gi.tex[2]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
 	// framebuffer
@@ -315,13 +301,13 @@ static void setup_deferred_shading(uint32_t w, uint32_t h) {
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,  GL_TEXTURE_2D, _gi.tex[0], 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gi.tex[1], 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _gi.tex[2], 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, _gi.tex[3], 0);
+	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, _gi.tex[3], 0);
 
 	// setup G-buffers
 	GLenum fbos[] = {
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
-		GL_COLOR_ATTACHMENT2,
+		//GL_COLOR_ATTACHMENT2,
 		//GL_COLOR_ATTACHMENT3,
 		//GL_COLOR_ATTACHMENT2,
 		//GL_COLOR_ATTACHMENT3,
@@ -376,84 +362,50 @@ static void setup_deferred_shading(uint32_t w, uint32_t h) {
  * (transparent pass is after shading) */
 static void start_geometry_pass()
 {
+	//glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, _gi.fbo);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 	tz_shader_bind(&_gi.geometry);
 
-	tz_mat4 view_matrix;
-	tz_cam_mkview(&_gi.cam, &view_matrix);
-	tz_mat4_mul(&_gi.VP, &_gi.P, &view_matrix);
+	tz_cam_mkview(&_gi.cam, &_gi.V);
+	tz_mat4_mul(&_gi.VP, &_gi.P, &_gi.V);
 	tz_mat4_inverse(&_gi.iVP, &_gi.VP);
+	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.VP.f);
 }
 
 /* fill G-objects (getting scene ready for shading pass) */
 static void do_geometry_pass()
 {
-	float tmp[4];
-	tz_vec4_store4fv(_gi.cam.pos, tmp);
-	glUniform4fv(7, 1, tmp);
+	float eye[4];
 
-	tz_mat4 model_matrix, view_matrix, mvp_matrix;
-	tz_cam_mkview(&_gi.cam, &view_matrix);
+	tz_vec4_store4fv(_gi.cam.pos, eye);
+	glUniform4fv(7, 1, eye);
 
-	// TODO: unecessary matrices multiplication
 	for (int i=0; i<_gi.nlights; ++i) {
+		tz_mat4 model_matrix, normal_matrix;
 
 		tz_mat4_set_translation(&model_matrix, _gi.light[i]);
-		tz_mat4_mul(&mvp_matrix, &_gi.VP, &model_matrix);
-		tz_mat4_mul(&_gi.MV, &view_matrix, &model_matrix);
-		tz_mat4_mul(&_gi.MVP, &_gi.P, &_gi.MV);
+		tz_mat4_inverse(&normal_matrix, &model_matrix);
+		tz_mat4_transpose(&normal_matrix, &normal_matrix);
 
-		tz_mat4_inverse(&_gi.N, &model_matrix);
-		tz_mat4_transpose(&_gi.N, &_gi.N);
-
-		glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
-		glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
-		glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.N.f);
+		glUniformMatrix4fv(0, 1, GL_TRUE,  model_matrix.f);
+		glUniformMatrix4fv(2, 1, GL_TRUE,  normal_matrix.f);
 
 		glBindVertexArray(_gi.dbg_vao);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	}
 
-	_gi.MV = view_matrix;
-	tz_mat4_inverse(&_gi.iMV, &_gi.MV);
+	tz_mat4 model_matrix, normal_matrix;
+	tz_mat4_mkidentity(&model_matrix);
+	tz_mat4_mkidentity(&normal_matrix);
 
-	tz_mat4_mul(&_gi.MVP, &_gi.P, &_gi.MV);
-	tz_mat4_inverse(&_gi.iMVP, &_gi.MVP);
-
-#if 1
-	tz_mat4_inverse(&_gi.N, &model_matrix);
-	tz_mat4_transpose(&_gi.N, &_gi.N);
-#else
-	tz_mat4_mkidentity(&_gi.N);
-#endif
-
-	glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
-	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
-	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.N.f);
-	glUniformMatrix4fv(4, 1, GL_TRUE,  _gi.iP.f);
-	glUniformMatrix4fv(5, 1, GL_TRUE,  _gi.iMVP.f);
-
-
-	//glActiveTexture(GL_TEXTURE0+0);
-	//glBindTexture(GL_TEXTURE_2D, _gi.eyebot_dif.id);
-
-	//glActiveTexture(GL_TEXTURE0+1);
-	//glBindTexture(GL_TEXTURE_2D, _gi.eyebot_nor.id);
-
-	//glActiveTexture(GL_TEXTURE0+2);
-	//glBindTexture(GL_TEXTURE_2D, _gi.eyebot_spc.id);
+	glUniformMatrix4fv(0, 1, GL_TRUE,  model_matrix.f);
+	glUniformMatrix4fv(2, 1, GL_TRUE,  normal_matrix.f);
 
 	tz_gpu_obj_draw(&_gi.eyebot_obj);
-
-	//for p in programs
-	//	for t in textures
-	//		for m in material
-	//			for u in unifomrs
-
-	//glBindVertexArray(_gi.dbg_vao);
-	//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 static void end_geometry_pass()
@@ -462,6 +414,10 @@ static void end_geometry_pass()
 
 static void start_shading_pass()
 {
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+
 #if 1
 	glActiveTexture(GL_TEXTURE0+0);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[0]);
@@ -471,9 +427,10 @@ static void start_shading_pass()
 
 	glActiveTexture(GL_TEXTURE0+2);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[2]);
-
+#if 0
 	glActiveTexture(GL_TEXTURE0+3);
 	glBindTexture(GL_TEXTURE_2D, _gi.tex[3]);
+#endif
 #else
 	glBindTextures(...);
 #endif
@@ -489,31 +446,25 @@ static void start_shading_pass()
 	glBindVertexArray(_gi.vao);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
+	float tmp[4];
+
+	tz_vec4_store4fv(_gi.cam.pos, tmp);
+	glUniform4fv(0, 1, tmp);
+
+	glUniform1i(1, _deffered_shading_debug);
+	glUniformMatrix4fv(2, 1, GL_TRUE,  _gi.iVP.f);
+	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.V.f);
 }
 
 static void do_shading_pass()
 {
-	float tmp[4];
-	glUniformMatrix4fv(0, 1, GL_TRUE,  _gi.MVP.f);
-	glUniformMatrix4fv(1, 1, GL_TRUE,  _gi.MV.f);
-	glUniformMatrix4fv(3, 1, GL_TRUE,  _gi.iP.f);
-	glUniformMatrix4fv(4, 1, GL_TRUE,  _gi.iVP.f);
-	glUniformMatrix4fv(5, 1, GL_TRUE,  _gi.iMVP.f);
-
-	glUniform1i(6, _deffered_shading_debug);
-
-	tz_vec4_store4fv(_gi.cam.pos, tmp);
-	glUniform4fv(7, 1, tmp);
-
 	tz_vec4 tmp_lights[50];
-
 	for (int i=0; i<_gi.nlights; ++i) {
-		//tmp_lights[i] = tz_mat4_mulv(&_gi.MV, _gi.light[i]);
-		tmp_lights[i] = _gi.light[i];
+		tmp_lights[i] = _gi.light[i]; // in world
 	}
 
-	glUniform1i(8,  _gi.nlights);
-	glUniform4fv(9, _gi.nlights, (float *)tmp_lights);
+	glUniform1i(9,  _gi.nlights);
+	glUniform4fv(10, _gi.nlights, (float *)tmp_lights);
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
@@ -549,7 +500,7 @@ static uint32_t tick(uint32_t interval, void *param)
 	event.user = userevent;
 
 	SDL_PushEvent(&event);
-	return(interval);
+	return interval;
 }
 
 static GLchar *readfile(const char *name)

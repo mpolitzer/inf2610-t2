@@ -39,7 +39,6 @@ layout(location =10) uniform vec4 light[50];
 layout(binding = 0) uniform sampler2D Gdep;
 layout(binding = 1) uniform sampler2D Gnor;
 layout(binding = 2) uniform sampler2D Gdif;
-layout(binding = 3) uniform sampler2D Gpos;
 
 in  vec2 f_pos;
 out vec4 o_color;
@@ -51,31 +50,30 @@ void main()
 
 	float dep = texture(Gdep, tex).r*2-1;
 	vec4  pos = iP * vec4(f_pos, dep, 1); // clip -> eye
-	//vec4  pos = texture(Gpos, tex)*2-1;
-	vec4  nor = texture(Gnor, tex)*-2+1;
+	vec4  nor = texture(Gnor, tex)*2-1;
 	vec4  col = texture(Gdif, tex);
 
 	int mi = 1;
 
-	if (debug_flag == 1) { o_color = abs(nor);               return; }
-	if (debug_flag == 2) { o_color = vec4(pos.xyz/pos.w, 1); return; }
-	if (debug_flag == 3) { // in eye coordiantes
-		vec4 p = texture(Gpos, tex);
-		o_color = vec4(p.xyz/p.w, 1);
-		return;
-	}
-
-	if (debug_flag == 4) { o_color = vec4(texture(Gdep, tex).rrr, 1); return; }
-
 	vec3 color = vec3(0,0,0);;
 	for (int i=0; i<nlights; ++i) {
-		vec3 p     = (pos/pos.w).xyz;
+		vec3 lcolor = vec3(1,1,1);
+		if (i == 0) {
+			lcolor = vec3(1,0,0);
+		} else if (i == 1) {
+			lcolor = vec3(0,1,0);
+		}
+		vec3 p     = (pos.xyz/pos.w);
 		vec3 view  = normalize(p);
-		vec3 n     = normalize(nor/nor.w).xyz;
+		vec3 n     = normalize(nor.xyz/nor.w);
 
-		vec3 l_    = light[i].xyz/light[i].w - p;
+		vec3 l_    = (light[i].xyz/light[i].w) - p;
 		vec3 l     = normalize(l_);
 		float llen = length(l_);
+
+		// area of influence (This is a HACK)
+		if (llen > 100) continue;
+
 		float att  = 1.0 / dot(vec3(1, llen, llen*llen), vec3(0.1, 0.1, 0.5));
 
 		vec3 dif_mat = vec3(1,1,1),
@@ -86,20 +84,18 @@ void main()
 
 		float ndotl = max(dot(n,l), 0);
 		if (ndotl > 0) {
-			dif = att * ndotl * dif_mat;
-
+			dif = att * lcolor * ndotl * dif_mat;
 			vec3 reflected = reflect(-l,n);
 			float angle    = clamp(dot(reflected,view), 0.0, 1.0);
-			float shi      = 30;
-			spc = att * pow(angle, shi) * spc_mat; // <- insert material specular + shininess
+			float shi      = 38.5;
+			spc = att * lcolor * pow(angle, shi) * spc_mat; // <- insert material specular + shininess
 		}
 
-		if (debug_flag == -1)
-			color += dif;
-		else if (debug_flag == -2)
-			color += spc;
-		else
+		if (debug_flag == -1) {
+			color += l;
+		} else {
 			color += dif + spc;
+		}
 	}
 
 	o_color.rgb = color;

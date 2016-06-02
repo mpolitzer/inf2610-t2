@@ -236,8 +236,8 @@ int main(int argc, const char *argv[])
 			}
 			redraw();
 
-			tz_cam_fwd(&_gi.cam, fast*fwd);
-			tz_cam_up(&_gi.cam, fast*up);
+			tz_cam_fwd(&_gi.cam,    fast*fwd);
+			tz_cam_up(&_gi.cam,     fast*up);
 			tz_cam_strafe(&_gi.cam, fast*right);
 			//tz_vec4_print(_gi.cam.pos);
 		}}
@@ -259,8 +259,8 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
 	 * create the textures and bind them to the framebuffer object
 	 *
 	 * textures outputs:
-	 * 0) pos
-	 * 1) nor
+	 * 0) nor
+	 * 1) diffuse+shi
 	 */
 
 	// depth
@@ -271,7 +271,8 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0,
+			GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 	// nor
 	glGenTextures(1, &_gi.tex[1]);
@@ -291,28 +292,20 @@ static void setup_deferred_shading(uint32_t w, uint32_t h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
-	// pos
-	glGenTextures(1, &_gi.tex[3]);
-	glBindTexture(GL_TEXTURE_2D, _gi.tex[3]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-
 	// framebuffer
 	glGenFramebuffers(1, &_gi.fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, _gi.fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,  GL_TEXTURE_2D, _gi.tex[0], 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gi.tex[1], 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _gi.tex[2], 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, _gi.tex[3], 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER,
+			GL_DEPTH_ATTACHMENT,  GL_TEXTURE_2D, _gi.tex[0], 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER,
+			GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gi.tex[1], 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER,
+			GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _gi.tex[2], 0);
 
 	// setup G-buffers
 	GLenum fbos[] = {
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
-		GL_COLOR_ATTACHMENT2,
 	};
 	glDrawBuffers(sizeof(fbos)/sizeof(*fbos), fbos);
 

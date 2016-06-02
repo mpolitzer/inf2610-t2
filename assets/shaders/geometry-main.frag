@@ -8,11 +8,10 @@ layout(location = 2) uniform mat4 N;
 
 in  vec4 f_nor;
 in  vec4 f_pos;
-out vec4 o_data[3];
+out vec4 o_data[2];
 
 void main()
 {
-	o_data[0] = f_nor;
+	o_data[0] = vec4(f_nor.xyz*.5+.5, 1);
 	o_data[1] = vec4(1,1,1,1); // <- material
-	o_data[2] = f_pos;
 }
